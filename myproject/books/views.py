@@ -6,16 +6,18 @@ from drf_yasg import openapi
 
 from .models import Book, Author
 from .serializers import BookSerializer, AuthorSerializer
+from categories.models import Category  # 👈 NEW
 from accounts.permissions import IsEmailAdmin
 
 
 # ---------------- Swagger Request Body for Book ----------------
 book_request_body = openapi.Schema(
     type=openapi.TYPE_OBJECT,
-    required=['title', 'author', 'price'],
+    required=['title', 'author', 'category', 'price'],  # 👈 category added
     properties={
         'title': openapi.Schema(type=openapi.TYPE_STRING, description='Book title'),
         'author': openapi.Schema(type=openapi.TYPE_INTEGER, description='Author ID'),
+        'category': openapi.Schema(type=openapi.TYPE_INTEGER, description='Category ID'),  # 👈 NEW
         'price': openapi.Schema(type=openapi.TYPE_NUMBER, description='Book price')
     }
 )
@@ -35,7 +37,8 @@ author_request_body = openapi.Schema(
     method='get',
     manual_parameters=[
         openapi.Parameter('title', openapi.IN_QUERY, description="Search by book title", type=openapi.TYPE_STRING),
-        openapi.Parameter('author', openapi.IN_QUERY, description="Search by author name", type=openapi.TYPE_STRING)
+        openapi.Parameter('author', openapi.IN_QUERY, description="Search by author name", type=openapi.TYPE_STRING),
+        openapi.Parameter('category', openapi.IN_QUERY, description="Search by category name", type=openapi.TYPE_STRING)  # 👈 NEW
     ],
     responses={200: BookSerializer(many=True)}
 )
@@ -44,12 +47,15 @@ author_request_body = openapi.Schema(
 def list_books(request):
     title = request.GET.get('title')
     author = request.GET.get('author')
+    category = request.GET.get('category')  # 👈 NEW
     books = Book.objects.all()
 
     if title:
         books = books.filter(title__icontains=title)
     if author:
         books = books.filter(author__name__icontains=author)
+    if category:  # 👈 NEW
+        books = books.filter(category__name__icontains=category)
 
     serializer = BookSerializer(books, many=True)
     return Response(serializer.data)
@@ -159,6 +165,3 @@ def delete_author(request, author_id):
         return Response({"message": "Author deleted successfully"})
     except Author.DoesNotExist:
         return Response({"message": "Author not found"}, status=404)
-
-
-

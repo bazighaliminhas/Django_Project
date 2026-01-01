@@ -30,15 +30,10 @@ category_request_body = openapi.Schema(
 @permission_classes([IsAuthenticated])
 def list_categories(request):
     name = request.GET.get('name')
+    categories = Category.objects.all()
 
-    # Admin sees all categories
-    if hasattr(request.user, 'email') and request.user.email == "bazighaliminhas1@gmail.com":
-        categories = Category.objects.all()
-    else:
-        # Regular users can filter by name
-        categories = Category.objects.all()
-        if name:
-            categories = categories.filter(name__icontains=name)
+    if name:
+        categories = categories.filter(name__icontains=name)
 
     serializer = CategorySerializer(categories, many=True)
     return Response(serializer.data)
@@ -56,8 +51,7 @@ def add_category(request):
     return Response(serializer.errors, status=400)
 
 
-@swagger_auto_schema(method='put', request_body=category_request_body)
-@swagger_auto_schema(method='patch', request_body=category_request_body)
+@swagger_auto_schema(methods=['put', 'patch'], request_body=category_request_body)
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated, IsEmailAdmin])
 def update_category(request, category_id):
@@ -79,6 +73,6 @@ def delete_category(request, category_id):
     try:
         category = Category.objects.get(id=category_id)
         category.delete()
-        return Response({"message": "Category deleted successfully"})
+        return Response(status=204)  # RESTful DELETE
     except Category.DoesNotExist:
         return Response({"message": "Category not found"}, status=404)
