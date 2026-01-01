@@ -22,7 +22,11 @@ category_request_body = openapi.Schema(
 @swagger_auto_schema(
     method='get',
     manual_parameters=[
-        openapi.Parameter('name', openapi.IN_QUERY, description="Filter by category name", type=openapi.TYPE_STRING)
+        openapi.Parameter(
+            'name', openapi.IN_QUERY,
+            description="Filter by category name and get its books",
+            type=openapi.TYPE_STRING
+        )
     ],
     responses={200: CategorySerializer(many=True)}
 )
@@ -30,8 +34,11 @@ category_request_body = openapi.Schema(
 @permission_classes([IsAuthenticated])
 def list_categories(request):
     name = request.GET.get('name')
+
+    # Fetch all categories
     categories = Category.objects.all()
 
+    # Filter by name if provided
     if name:
         categories = categories.filter(name__icontains=name)
 
@@ -73,6 +80,6 @@ def delete_category(request, category_id):
     try:
         category = Category.objects.get(id=category_id)
         category.delete()
-        return Response(status=204)  # RESTful DELETE
+        return Response({"message": "Category deleted successfully"}, status=204)
     except Category.DoesNotExist:
         return Response({"message": "Category not found"}, status=404)
