@@ -7,6 +7,7 @@ class AuthUserWrapper:
     def __init__(self, user):
         self.user = user
         self.is_authenticated = True  # ✅ This is what DRF checks
+        
 
     def __getattr__(self, name):
         return getattr(self.user, name)

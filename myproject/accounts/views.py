@@ -11,6 +11,28 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
 
+from .models import User, PasswordResetToken
+
+# Forgot Password
+forgot_password_request_body = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    required=['email'],
+    properties={
+        'email': openapi.Schema(type=openapi.TYPE_STRING),
+    }
+)
+
+# Reset Password
+reset_password_request_body = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    required=['new_password'],
+    properties={
+        'new_password': openapi.Schema(type=openapi.TYPE_STRING),
+    }
+)
+
+
+
 
 # Swagger Schemas
 register_request_body = openapi.Schema(
@@ -181,3 +203,84 @@ def update_user(request, user_id):
         })
 
     return Response(serializer.errors, status=400)
+
+
+
+
+# ---------------- Forgot Password ----------------
+
+# Swagger schema
+forgot_password_request_body = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    required=['email'],
+    properties={
+        'email': openapi.Schema(type=openapi.TYPE_STRING, description='Registered email of the user'),
+    }
+)
+
+reset_password_request_body = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    required=['new_password'],
+    properties={
+        'new_password': openapi.Schema(type=openapi.TYPE_STRING, description='New password to reset'),
+    }
+)
+
+# ---------------- Forgot Password API ----------------
+@swagger_auto_schema(method='post', request_body=forgot_password_request_body)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({"message": "Email is required"}, status=400)
+
+    try:
+        user = User.objects.get(email=email)
+    except User.DoesNotExist:
+        return Response({"message": "User with this email does not exist"}, status=404)
+
+    # Remove any old tokens
+    PasswordResetToken.objects.filter(user=user).delete()
+
+    # Create a new reset token
+    token = get_random_string(50)
+    PasswordResetToken.objects.create(user=user, token=token)
+
+    # Construct reset link
+    reset_link = f"http://127.0.0.1:8000/api/reset-password/{token}/"
+
+    # Send reset email
+    send_mail(
+        subject='Reset Your Password',
+        message=f'Hello {user.username},\n\nClick the link below to reset your password:\n{reset_link}\n\nIf you did not request this, please ignore this email.',
+        from_email=settings.EMAIL_HOST_USER,
+        recipient_list=[email],
+        fail_silently=False,
+    )
+
+    return Response({"message": "Password reset email sent successfully"})
+
+
+# ---------------- Reset Password API ----------------
+@swagger_auto_schema(method='post', request_body=reset_password_request_body)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request, token):
+    try:
+        reset_obj = PasswordResetToken.objects.get(token=token)
+    except PasswordResetToken.DoesNotExist:
+        return Response({"message": "Invalid or expired token"}, status=400)
+
+    new_password = request.data.get('new_password')
+    if not new_password:
+        return Response({"message": "New password is required"}, status=400)
+
+    user = reset_obj.user
+    user.password = make_password(new_password)
+    user.save()
+
+    # Delete token after successful reset
+    reset_obj.delete()
+
+    return Response({"message": "Password reset successfully"})
